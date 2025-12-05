@@ -1,0 +1,153 @@
+/**
+ * AWS Account Name Display Styles
+ * Matches AWS Console aesthetic for seamless integration
+ */
+
+.aws-account-name-display {
+  /* Typography matching AWS Console */
+  font-family: "Amazon Ember", "Helvetica Neue", Roboto, Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+
+  /* Colors matching AWS Console dark theme */
+  color: #ffffff;
+  background-color: #232f3e;
+
+  /* Spacing and layout */
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  margin-right: 8px;
+  border-radius: 4px;
+
+  /* Truncation styles */
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  /* Subtle border for definition */
+  border: 1px solid #3d5a80;
+
+  /* Smooth transitions */
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+
+  /* Cursor indicates interactivity */
+  cursor: default;
+}
+
+/* Hover state */
+.aws-account-name-display:hover {
+  background-color: #3d5a80;
+  border-color: #5c7caa;
+}
+
+/* Tooltip styling via title attribute - browser native */
+/* For custom tooltip, we use a pseudo-element approach */
+.aws-account-name-display[title] {
+  position: relative;
+}
+
+/* Custom tooltip on hover */
+.aws-account-name-display::after {
+  content: attr(title);
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 8px;
+
+  /* Tooltip appearance */
+  background-color: #16191f;
+  color: #ffffff;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 400;
+  white-space: nowrap;
+
+  /* Shadow for depth */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+
+  /* Hidden by default */
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+
+  /* Smooth transition */
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+
+  /* Z-index to appear above other elements */
+  z-index: 10000;
+}
+
+/* Show tooltip on hover */
+.aws-account-name-display:hover::after {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Tooltip arrow */
+.aws-account-name-display::before {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 2px;
+
+  /* Arrow shape */
+  border: 6px solid transparent;
+  border-bottom-color: #16191f;
+
+  /* Hidden by default */
+  opacity: 0;
+  visibility: hidden;
+
+  /* Smooth transition */
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+
+  /* Z-index */
+  z-index: 10001;
+}
+
+/* Show arrow on hover */
+.aws-account-name-display:hover::before {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Light theme variant (for AWS Console light mode) */
+@media (prefers-color-scheme: light) {
+  .aws-account-name-display {
+    color: #16191f;
+    background-color: #f2f3f3;
+    border-color: #d5dbdb;
+  }
+
+  .aws-account-name-display:hover {
+    background-color: #e9ebeb;
+    border-color: #879596;
+  }
+
+  .aws-account-name-display::after {
+    background-color: #16191f;
+    color: #ffffff;
+  }
+
+  .aws-account-name-display::before {
+    border-bottom-color: #16191f;
+  }
+}
+
+/* Unknown account styling */
+.aws-account-name-display[data-full-name="Unknown Account"] {
+  color: #ff9900;
+  border-color: #ff9900;
+  font-style: italic;
+}
+
+.aws-account-name-display[data-full-name="Unknown Account"]:hover {
+  background-color: rgba(255, 153, 0, 0.1);
+}
