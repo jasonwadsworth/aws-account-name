@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AWS Account Name Display",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Displays AWS account names alongside account numbers in the AWS Console",
   "permissions": ["storage"],
   "host_permissions": [
@@ -14,12 +14,12 @@
   "content_scripts": [
     {
       "matches": ["https://*.awsapps.com/start/*"],
-      "js": ["src/portal-content.js"],
+      "js": ["src/retry-utils.js", "src/portal-content.js"],
       "run_at": "document_idle"
     },
     {
       "matches": ["https://*.console.aws.amazon.com/*"],
-      "js": ["src/console-content.js"],
+      "js": ["src/retry-utils.js", "src/console-content.js"],
       "css": ["src/display.css"],
       "run_at": "document_idle"
     }

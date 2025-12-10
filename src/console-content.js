@@ -3,6 +3,19 @@
  * Displays account name in AWS Console pages
  */
 
+// Import retry utilities
+let retryUtils;
+if (typeof require !== 'undefined') {
+  retryUtils = require('./retry-utils.js');
+} else {
+  // In browser context, retry-utils will be loaded separately
+  retryUtils = {
+    RETRY_CONFIG: window.RETRY_CONFIG,
+    retryWithBackoff: window.retryWithBackoff,
+    waitForDOMReady: window.waitForDOMReady
+  };
+}
+
 // Configuration
 const CONFIG = {
   maxNameLength: 30,
@@ -172,33 +185,59 @@ function getCurrentAccountId() {
 }
 
 /**
- * Waits for the account element to appear in the DOM
+ * Waits for the account element to appear in the DOM with retry logic
  * @param {number} timeout - Maximum wait time in milliseconds
  * @returns {Promise<Element|null>}
  */
-function waitForAccountElement(timeout = CONFIG.waitTimeout) {
-  return new Promise((resolve) => {
-    const startTime = Date.now();
+async function waitForAccountElement(timeout = CONFIG.waitTimeout) {
+  const config = retryUtils?.RETRY_CONFIG?.console || {
+    maxAttempts: 5,
+    initialDelay: 500,
+    maxDelay: 2500,
+    backoffMultiplier: 500,
+    backoffType: 'linear'
+  };
 
-    const check = () => {
+  const retryFn = retryUtils?.retryWithBackoff ||
+                  (typeof window !== 'undefined' && window.retryWithBackoff);
+
+  if (!retryFn) {
+    // Fallback to original polling logic
+    return new Promise((resolve) => {
+      const startTime = Date.now();
+
+      const check = () => {
+        const element = document.querySelector(CONSOLE_SELECTORS.accountMenu) ||
+                        document.querySelector(CONSOLE_SELECTORS.accountMenuAlt);
+
+        if (element) {
+          resolve(element);
+          return;
+        }
+
+        if (Date.now() - startTime >= timeout) {
+          resolve(null);
+          return;
+        }
+
+        setTimeout(check, CONFIG.pollInterval);
+      };
+
+      check();
+    });
+  }
+
+  // Use retry logic
+  const result = await retryFn(
+    () => {
       const element = document.querySelector(CONSOLE_SELECTORS.accountMenu) ||
-                      document.querySelector(CONSOLE_SELECTORS.accountMenuFallback);
+                      document.querySelector(CONSOLE_SELECTORS.accountMenuAlt);
+      return element || null;
+    },
+    config
+  );
 
-      if (element) {
-        resolve(element);
-        return;
-      }
-
-      if (Date.now() - startTime >= timeout) {
-        resolve(null);
-        return;
-      }
-
-      setTimeout(check, CONFIG.pollInterval);
-    };
-
-    check();
-  });
+  return result;
 }
 
 /**
@@ -358,8 +397,9 @@ function setupNavigationObserver() {
   const observer = new MutationObserver(() => {
     if (location.href !== lastUrl) {
       lastUrl = location.href;
-      // Delay to allow page to update
-      setTimeout(updateDisplay, 500);
+      console.log('[AWS Account Display] URL changed, restarting retry logic');
+      // Restart initialization with fresh retry state
+      init();
     }
   });
 
@@ -370,7 +410,8 @@ function setupNavigationObserver() {
 
   // Also listen for popstate events
   window.addEventListener('popstate', () => {
-    setTimeout(updateDisplay, 500);
+    console.log('[AWS Account Display] Popstate event, restarting retry logic');
+    init();
   });
 }
 
@@ -378,13 +419,19 @@ function setupNavigationObserver() {
  * Main initialization function
  */
 async function init() {
-  // Wait for account element to appear
+  // Wait for DOM to be ready
+  const waitFn = retryUtils?.waitForDOMReady ||
+                 (typeof window !== 'undefined' && window.waitForDOMReady);
+
+  if (waitFn) {
+    await waitFn();
+  }
+
+  // Wait for account element to appear with retry logic
   const accountElement = await waitForAccountElement();
 
   if (!accountElement) {
-    console.log('[AWS Account Display] Account element not found, retrying...');
-    // Retry after a delay
-    setTimeout(init, 2000);
+    console.warn('[AWS Account Display] Account element not found after all retries');
     return;
   }
 

@@ -3,6 +3,19 @@
  * Extracts account information from IAM Identity Center access portal
  */
 
+// Import retry utilities
+let retryUtils;
+if (typeof require !== 'undefined') {
+  retryUtils = require('./retry-utils.js');
+} else {
+  // In browser context, retry-utils will be loaded separately
+  retryUtils = {
+    RETRY_CONFIG: window.RETRY_CONFIG,
+    retryWithBackoff: window.retryWithBackoff,
+    waitForDOMReady: window.waitForDOMReady
+  };
+}
+
 // Selectors for IAM Identity Center Portal elements
 const PORTAL_SELECTORS = {
   // Primary selectors based on common portal structure
@@ -197,20 +210,64 @@ async function sendAccountsToBackground(accounts) {
 }
 
 /**
+ * Extracts accounts with retry logic
+ * @returns {Promise<Array<{accountId: string, accountName: string}>>}
+ */
+async function extractAccountsWithRetry() {
+  const config = retryUtils?.RETRY_CONFIG?.portal || {
+    maxAttempts: 5,
+    initialDelay: 200,
+    maxDelay: 2000,
+    backoffMultiplier: 2,
+    backoffType: 'exponential'
+  };
+
+  const retryFn = retryUtils?.retryWithBackoff ||
+                  (typeof window !== 'undefined' && window.retryWithBackoff);
+
+  if (!retryFn) {
+    // Fallback: just try once without retry
+    const accounts = extractAccountsFromPortal();
+    return accounts.length > 0 ? accounts : [];
+  }
+
+  const result = await retryFn(
+    () => {
+      const accounts = extractAccountsFromPortal();
+      // Return accounts if found, null otherwise to trigger retry
+      return accounts.length > 0 ? accounts : null;
+    },
+    config
+  );
+
+  return result || [];
+}
+
+/**
  * Main initialization function
  */
-function init() {
-  // Initial extraction
-  const accounts = extractAccountsFromPortal();
+async function init() {
+  // Wait for DOM to be ready
+  const waitFn = retryUtils?.waitForDOMReady ||
+                 (typeof window !== 'undefined' && window.waitForDOMReady);
+
+  if (waitFn) {
+    await waitFn();
+  }
+
+  // Initial extraction with retry
+  const accounts = await extractAccountsWithRetry();
 
   if (accounts.length > 0) {
     console.log('[AWS Account Display] Found', accounts.length, 'accounts');
     sendAccountsToBackground(accounts);
+  } else {
+    console.warn('[AWS Account Display] No accounts found after retries');
   }
 
   // Watch for dynamic content changes
-  observePortalChanges(() => {
-    const updatedAccounts = extractAccountsFromPortal();
+  observePortalChanges(async () => {
+    const updatedAccounts = await extractAccountsWithRetry();
     if (updatedAccounts.length > 0) {
       console.log('[AWS Account Display] Updated accounts:', updatedAccounts.length);
       sendAccountsToBackground(updatedAccounts);
@@ -229,6 +286,7 @@ if (document.readyState === 'loading') {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     extractAccountsFromPortal,
+    extractAccountsWithRetry,
     extractAccountFromElement,
     extractAccountsFromText,
     observePortalChanges,
